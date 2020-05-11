@@ -11,6 +11,14 @@ npm install -g puppeteer-cli
 ## Usage
 
 ```bash
+puppeteer bulk-print <config file>
+
+Print a list of HTML file according to a json config file
+//TODO
+```
+
+```bash
+
 puppeteer print <url> [output]
 
 Print an HTML file or URL to PDF

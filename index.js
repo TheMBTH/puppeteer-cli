@@ -14,7 +14,7 @@ function sleep(ms) {
 const commonOptions = {
     'sandbox': {
         boolean: true,
-        default: true
+        default: false
     },
     'timeout': {
         default: 30 * 1000,
@@ -31,6 +31,39 @@ const commonOptions = {
 };
 
 const argv = require('yargs')
+    .command({
+        command: 'bulk-print <batchFile>',
+        builder: {
+            ...commonOptions,
+            'background': {
+                boolean: true,
+                default: true
+            },
+            'margin-top': {
+                default: '6.25mm'
+            },
+            'margin-right': {
+                default: '6.25mm'
+            },
+            'margin-bottom': {
+                default: '14.11mm'
+            },
+            'margin-left': {
+                default: '6.25mm'
+            },
+            'format': {
+                default: 'A4'
+            },
+        },
+        handler: async argv => {
+            try {
+                await bulkPrint(argv);
+            } catch (err) {
+                console.log('Failed to generate pdf:', err);
+                process.exit(1);
+            }
+        }
+    })
     .command({
         command: 'print <url> [output]',
         desc: 'Print an HTML file or URL to PDF',
