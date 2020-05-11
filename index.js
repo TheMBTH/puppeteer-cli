@@ -4,6 +4,11 @@ const puppeteer = require('puppeteer');
 const parseUrl = require('url-parse');
 const fileUrl = require('file-url');
 const isUrl = require('is-url');
+const fs = require('fs');
+
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 // common options for both print and screenshot commands
 const commonOptions = {
@@ -71,7 +76,7 @@ const argv = require('yargs')
             try {
                 await print(argv);
             } catch (err) {
-                console.error('Failed to generate pdf:', err);
+                console.log('Failed to generate pdf:', err);
                 process.exit(1);
             }
         }
@@ -97,7 +102,7 @@ const argv = require('yargs')
             try {
                 await screenshot(argv);
             } catch (err) {
-                console.error('Failed to take screenshot:', err);
+                console.log('Failed to take screenshot:', err);
                 process.exit(1);
             }
         }
@@ -106,20 +111,51 @@ const argv = require('yargs')
     .help()
     .argv;
 
+
+async function bulkPrint(argv) {
+    let rawdata = fs.readFileSync(argv.batchFile);
+    let config = JSON.parse(rawdata)["data"];
+
+    const browser = await puppeteer.launch(buildLaunchOptions(argv));
+    const page = await browser.newPage();
+    for (const pdf of config) {
+        const htmlFile = fileUrl(pdf["htmlFile"]);
+        const pdfFile = pdf["tmpPDFFile"];
+
+        await page.goto(htmlFile, buildNavigationOptions(argv));
+
+        const displayFooter = !!pdf["pdfObject"]["footerTemplate"];
+        const buffer = await page.pdf({
+            path: pdfFile,
+            format: argv.format,
+            landscape: pdf["pdfObject"]["isLandscape"],
+            printBackground: true,
+            margin: {
+                top: argv.marginTop,
+                right: argv.marginRight,
+                bottom: displayFooter ? pdf["pdfObject"]["footerHeight"] : argv.marginBottom,
+                left: argv.marginLeft
+            },
+            displayHeaderFooter: displayFooter,
+            footerTemplate: pdf["pdfObject"]["footerTemplate"].replace(new RegExp('\\\\\"', 'g'),'"')
+        });
+        await sleep(20);
+    }
+
+    await browser.close();
+}
+
 async function print(argv) {
     const browser = await puppeteer.launch(buildLaunchOptions(argv));
     const page = await browser.newPage();
     const url = isUrl(argv.url) ? parseUrl(argv.url).toString() : fileUrl(argv.url);
 
     if (argv.cookie) {
-        console.error(`Setting cookies`);
         await page.setCookie(...buildCookies(argv));
     }
 
-    console.error(`Loading ${url}`);
     await page.goto(url, buildNavigationOptions(argv));
 
-    console.error(`Writing ${argv.output || 'STDOUT'}`);
     const buffer = await page.pdf({
         path: argv.output || null,
         format: argv.format,
@@ -140,7 +176,6 @@ async function print(argv) {
         await process.stdout.write(buffer);
     }
 
-    console.error('Done');
     await browser.close();
 }
 
@@ -153,12 +188,10 @@ async function screenshot(argv) {
         const formatMatch = argv.viewport.match(/^(?<width>\d+)[xX](?<height>\d+)$/);
 
         if (!formatMatch) {
-            console.error('Option --viewport must be in the format ###x### e.g. 800x600');
             process.exit(1);
         }
 
         const { width, height } = formatMatch.groups;
-        console.error(`Setting viewport to ${width}x${height}`);
         await page.setViewport({
             width: parseInt(width),
             height: parseInt(height)
@@ -166,14 +199,11 @@ async function screenshot(argv) {
     }
 
     if (argv.cookie) {
-        console.error(`Setting cookies`);
         await page.setCookie(...buildCookies(argv));
     }
 
-    console.error(`Loading ${url}`);
     await page.goto(url, buildNavigationOptions(argv));
 
-    console.error(`Writing ${argv.output || 'STDOUT'}`);
     const buffer = await page.screenshot({
         path: argv.output || null,
         fullPage: argv.fullPage,
@@ -184,7 +214,6 @@ async function screenshot(argv) {
         await process.stdout.write(buffer);
     }
 
-    console.error('Done');
     await browser.close();
 }
 
@@ -208,7 +237,7 @@ function buildNavigationOptions({ timeout, waitUntil }) {
 }
 
 function buildCookies({ url, cookie }) {
-    return [...cookie].map(cookieString => {
+    return [cookie].map(cookieString => {
         const delimiterOffset = cookieString.indexOf(':');
         if (delimiterOffset == -1) {
             throw new Error('cookie must contain : delimiter');
