@@ -5,7 +5,6 @@ const parseUrl = require('url-parse');
 const fileUrl = require('file-url');
 const isUrl = require('is-url');
 const fs = require('fs');
-const NB_INSTANCES = 4;
 
 function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
@@ -136,7 +135,7 @@ const argv = require('yargs')
             try {
                 await screenshot(argv);
             } catch (err) {
-                console.error('Failed to take screenshot:', err);
+                console.log('Failed to take screenshot:', err);
                 process.exit(1);
             }
         }
@@ -156,10 +155,8 @@ async function bulkPrint(argv) {
         const htmlFile = fileUrl(pdf["htmlFile"]);
         const pdfFile = pdf["tmpPDFFile"];
 
-        console.error(`Loading ${htmlFile}`);
         await page.goto(htmlFile, buildNavigationOptions(argv));
 
-        console.error(`Writing ${pdfFile}`);
         const displayFooter = !!pdf["pdfObject"]["footerTemplate"];
         const buffer = await page.pdf({
             path: pdfFile,
@@ -178,7 +175,6 @@ async function bulkPrint(argv) {
         await sleep(20);
     }
 
-    console.error('Done');
     await browser.close();
 }
 
@@ -188,15 +184,11 @@ async function print(argv) {
     const url = isUrl(argv.url) ? parseUrl(argv.url).toString() : fileUrl(argv.url);
 
     if (argv.cookie) {
-        console.error(`Setting cookies`);
         await page.setCookie(...buildCookies(argv));
     }
 
-    console.error(`Loading ${url}`);
     await page.goto(url, buildNavigationOptions(argv));
 
-    console.error(`Writing ${argv.output || 'STDOUT'}`);
-    console.error(argv.footerTemplate);
     const buffer = await page.pdf({
         path: argv.output || null,
         format: argv.format,
@@ -217,11 +209,8 @@ async function print(argv) {
         await process.stdout.write(buffer);
     }
 
-    console.error('Done');
     await browser.close();
 }
-
-
 
 async function screenshot(argv) {
     const browser = await puppeteer.launch(buildLaunchOptions(argv));
@@ -232,12 +221,10 @@ async function screenshot(argv) {
         const formatMatch = argv.viewport.match(/^(?<width>\d+)[xX](?<height>\d+)$/);
 
         if (!formatMatch) {
-            console.error('Option --viewport must be in the format ###x### e.g. 800x600');
             process.exit(1);
         }
 
         const { width, height } = formatMatch.groups;
-        console.error(`Setting viewport to ${width}x${height}`);
         await page.setViewport({
             width: parseInt(width),
             height: parseInt(height)
@@ -245,14 +232,11 @@ async function screenshot(argv) {
     }
 
     if (argv.cookie) {
-        console.error(`Setting cookies`);
         await page.setCookie(...buildCookies(argv));
     }
 
-    console.error(`Loading ${url}`);
     await page.goto(url, buildNavigationOptions(argv));
 
-    console.error(`Writing ${argv.output || 'STDOUT'}`);
     const buffer = await page.screenshot({
         path: argv.output || null,
         fullPage: argv.fullPage,
@@ -263,7 +247,6 @@ async function screenshot(argv) {
         await process.stdout.write(buffer);
     }
 
-    console.error('Done');
     await browser.close();
 }
 
